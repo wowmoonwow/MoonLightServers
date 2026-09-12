@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoonLightServers</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Ambient background blobs for the liquid-glass glow -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <!-- Top bar -->
+  <header class="topbar glass">
+    <div class="brand">
+      <div class="logo">🌙</div>
+      <h1>MoonLightServers</h1>
+    </div>
+    <div class="search-wrap">
+      <input id="searchInput" type="text" placeholder="Search servers..." />
+    </div>
+  </header>
+
+  <!-- Main 3-column layout -->
+  <main class="layout">
+
+    <!-- LEFT: Ad space -->
+    <aside class="ad-col">
+      <div class="ad-box glass">
+        <span class="ad-label">Advertisement</span>
+        <div class="ad-inner">
+          <p>Your Ad Here</p>
+          <small>300 × 600</small>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Server list -->
+    <section class="list-col">
+      <div class="list-header glass">
+        <h2>Server List</h2>
+        <span id="resultCount" class="count"></span>
+      </div>
+      <div id="serverList" class="server-list">
+        <!-- Server cards injected by JS -->
+      </div>
+    </section>
+
+    <!-- RIGHT: Tags / filters -->
+    <aside class="tags-col">
+      <div class="tags-box glass">
+        <h3>Filters</h3>
+
+        <div class="filter-group">
+          <label>Version</label>
+          <div id="versionTags" class="tag-list"></div>
+        </div>
+
+        <div class="filter-group">
+          <label>Keywords</label>
+          <div id="keywordTags" class="tag-list"></div>
+        </div>
+
+        <button id="clearFilters" class="clear-btn">Clear Filters</button>
+      </div>
+    </aside>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
