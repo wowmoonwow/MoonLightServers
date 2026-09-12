@@ -1,4 +1,4 @@
-// ---- Placeholder server data (all identical layout, random names) ----
+// ---- Placeholder server data ----
 const serverNames = [
   "Crimson Peak",
   "Azure Haven",
@@ -10,34 +10,48 @@ const serverNames = [
   "Stormwatch"
 ];
 
-const versions = ["1.21.1", "1.20.4", "1.19.4"];
-const keywordPool = ["Survival", "Economy", "SMP", "PvP", "Minigames", "Skyblock", "Creative"];
+// The first 3 names will be used for the paid / featured servers
+const featuredNames = ["Aurora Prime", "Celestial Core", "Obsidian Elite"];
 
-// Build servers with made-up player counts
-const servers = serverNames.map((name, i) => ({
-  name,
-  version: versions[i % versions.length],
-  ip: "mc.ExampleIp.net",
-  players: Math.floor(Math.random() * 900) + 20,   // made-up player amount
-  desc: "A short placeholder description for this server.",
-  keywords: [
-    keywordPool[i % keywordPool.length],
-    keywordPool[(i + 3) % keywordPool.length]
-  ]
-}));
+const versions = ["1.21.1", "1.20.4", "1.19.4"];
+
+function makeServer(name, i, featured) {
+  const online = Math.random() > 0.2; // ~80% online
+  return {
+    name,
+    version: versions[i % versions.length],
+    ip: "mc.ExampleIp.net",
+    players: online ? Math.floor(Math.random() * 900) + 20 : 0,
+    status: online ? "Online" : "Offline",
+    desc: "A short placeholder description for this server.",
+    featured
+  };
+}
+
+// Featured servers always online (they're paid)
+const featuredServers = featuredNames.map((n, i) => {
+  const s = makeServer(n, i, true);
+  s.status = "Online";
+  s.players = Math.floor(Math.random() * 900) + 100;
+  return s;
+});
+
+const normalServers = serverNames.map((n, i) => makeServer(n, i, false));
 
 // ---- State ----
 let activeVersion = null;
-let activeKeyword = null;
+let activeStatus = null;
 let searchText = "";
 
 // ---- Build filter tags ----
-const allVersions = [...new Set(servers.map(s => s.version))].sort().reverse();
-const allKeywords = [...new Set(servers.flatMap(s => s.keywords))].sort();
+const allVersions = [...new Set(
+  [...featuredServers, ...normalServers].map(s => s.version)
+)].sort().reverse();
+const allStatuses = ["Online", "Offline"];
 
 function buildTags() {
   const vBox = document.getElementById("versionTags");
-  const kBox = document.getElementById("keywordTags");
+  const sBox = document.getElementById("statusTags");
 
   allVersions.forEach(v => {
     const el = document.createElement("span");
@@ -52,120 +66,46 @@ function buildTags() {
     vBox.appendChild(el);
   });
 
-  allKeywords.forEach(k => {
+  allStatuses.forEach(st => {
     const el = document.createElement("span");
     el.className = "tag";
-    el.textContent = k;
-    el.dataset.keyword = k;
+    el.textContent = st;
+    el.dataset.status = st;
     el.onclick = () => {
-      activeKeyword = activeKeyword === k ? null : k;
+      activeStatus = activeStatus === st ? null : st;
       refreshTagStates();
       render();
     };
-    kBox.appendChild(el);
+    sBox.appendChild(el);
   });
 }
 
 function refreshTagStates() {
   document.querySelectorAll("[data-version]").forEach(el =>
     el.classList.toggle("active", el.dataset.version === activeVersion));
-  document.querySelectorAll("[data-keyword]").forEach(el =>
-    el.classList.toggle("active", el.dataset.keyword === activeKeyword));
+  document.querySelectorAll("[data-status]").forEach(el =>
+    el.classList.toggle("active", el.dataset.status === activeStatus));
 }
 
-// ---- Render server cards ----
-function render() {
-  const list = document.getElementById("serverList");
+// ---- Filtering ----
+function matches(s) {
+  const okVersion = !activeVersion || s.version === activeVersion;
+  const okStatus = !activeStatus || s.status === activeStatus;
+  const okSearch = !searchText ||
+    s.name.toLowerCase().includes(searchText) ||
+    s.ip.toLowerCase().includes(searchText);
+  return okVersion && okStatus && okSearch;
+}
 
-  const filtered = servers
-    .filter(s => {
-      const okVersion = !activeVersion || s.version === activeVersion;
-      const okKeyword = !activeKeyword || s.keywords.includes(activeKeyword);
-      const okSearch = !searchText ||
-        s.name.toLowerCase().includes(searchText) ||
-        s.ip.toLowerCase().includes(searchText);
-      return okVersion && okKeyword && okSearch;
-    })
-    // Default sort: most players online first
-    .sort((a, b) => b.players - a.players);
+// ---- Card HTML ----
+function cardHTML(s) {
+  const statusClass = s.status === "Online" ? "online" : "offline";
+  const playersLine = s.status === "Online"
+    ? `<span class="players"><span class="dot"></span>${s.players} Players Online</span>`
+    : `<span class="players" style="color:#f8a3a3;"><span class="dot" style="background:#f87171;box-shadow:none;"></span>Offline</span>`;
 
-  document.getElementById("resultCount").textContent =
-    `${filtered.length} server${filtered.length !== 1 ? "s" : ""}`;
-
-  if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty">No servers match your filters.</div>`;
-    return;
-  }
-
-  list.innerHTML = filtered.map(s => `
-    <article class="server-card">
-      <!-- Top half: placeholder banner + IP upper-right -->
+  return `
+    <article class="server-card ${s.featured ? "featured" : ""}">
       <div class="banner">
         PlaceHolder Banner
-        <div class="banner-ip">
-          <span class="ip-text">${s.ip}</span>
-          <button class="copy-btn" data-ip="${s.ip}">Copy</button>
-        </div>
-      </div>
-
-      <!-- Bottom half -->
-      <div class="card-body">
-        <div class="pfp">Blank<br>pfp</div>
-        <div class="info">
-          <div class="card-title">${s.name}</div>
-          <div class="info-row">
-            <span class="players"><span class="dot"></span>${s.players} Players Online</span>
-            <span class="card-desc">${s.desc}</span>
-          </div>
-        </div>
-        <div class="version-pill">${s.version}</div>
-      </div>
-    </article>
-  `).join("");
-
-  // Wire up copy buttons
-  list.querySelectorAll(".copy-btn").forEach(btn => {
-    btn.onclick = () => copyIP(btn);
-  });
-}
-
-// ---- Copy to clipboard ----
-function copyIP(btn) {
-  const ip = btn.dataset.ip;
-  navigator.clipboard.writeText(ip).then(() => showCopied(btn)).catch(() => {
-    const ta = document.createElement("textarea");
-    ta.value = ip;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    document.body.removeChild(ta);
-    showCopied(btn);
-  });
-}
-function showCopied(btn) {
-  const original = btn.textContent;
-  btn.textContent = "Copied!";
-  btn.classList.add("copied");
-  setTimeout(() => {
-    btn.textContent = original;
-    btn.classList.remove("copied");
-  }, 1500);
-}
-
-// ---- Search + clear ----
-document.getElementById("searchInput").addEventListener("input", e => {
-  searchText = e.target.value.trim().toLowerCase();
-  render();
-});
-document.getElementById("clearFilters").addEventListener("click", () => {
-  activeVersion = null;
-  activeKeyword = null;
-  searchText = "";
-  document.getElementById("searchInput").value = "";
-  refreshTagStates();
-  render();
-});
-
-// ---- Init ----
-buildTags();
-render();
+        ${s.featured ? `<span class="featured-badge">★ Featured</span>` : ""}
