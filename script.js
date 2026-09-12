@@ -10,7 +10,7 @@ const serverNames = [
   "Stormwatch"
 ];
 
-// The first 3 names will be used for the paid / featured servers
+// The 3 paid / featured servers
 const featuredNames = ["Aurora Prime", "Celestial Core", "Obsidian Elite"];
 
 const versions = ["1.21.1", "1.20.4", "1.19.4"];
@@ -28,7 +28,7 @@ function makeServer(name, i, featured) {
   };
 }
 
-// Featured servers always online (they're paid)
+// Featured servers are paid -> always online, healthy player counts
 const featuredServers = featuredNames.map((n, i) => {
   const s = makeServer(n, i, true);
   s.status = "Online";
@@ -106,6 +106,119 @@ function cardHTML(s) {
 
   return `
     <article class="server-card ${s.featured ? "featured" : ""}">
+      <!-- Top half: banner -->
       <div class="banner">
         PlaceHolder Banner
         ${s.featured ? `<span class="featured-badge">★ Featured</span>` : ""}
+        <div class="banner-ip">
+          <span class="ip-text">${s.ip}</span>
+          <button class="copy-btn" data-ip="${s.ip}">Copy</button>
+        </div>
+      </div>
+
+      <!-- Bottom half -->
+      <div class="card-body">
+        <div class="pfp">Blank<br>pfp</div>
+        <div class="info">
+          <div class="card-title-row">
+            <span class="card-title">${s.name}</span>
+            <span class="status ${statusClass}">
+              <span class="status-dot"></span>${s.status}
+            </span>
+          </div>
+          <div class="info-row">
+            ${playersLine}
+            <span class="card-desc">${s.desc}</span>
+          </div>
+        </div>
+        <div class="version-pill">${s.version}</div>
+      </div>
+    </article>
+  `;
+}
+
+// ---- Render ----
+function render() {
+  const list = document.getElementById("serverList");
+
+  const filteredFeatured = featuredServers
+    .filter(matches)
+    .sort((a, b) => b.players - a.players);
+
+  const filteredNormal = normalServers
+    .filter(matches)
+    // Default sort: most players online first
+    .sort((a, b) => b.players - a.players);
+
+  const total = filteredFeatured.length + filteredNormal.length;
+  document.getElementById("resultCount").textContent =
+    `${total} server${total !== 1 ? "s" : ""}`;
+
+  if (total === 0) {
+    list.innerHTML = `<div class="empty">No servers match your filters.</div>`;
+    return;
+  }
+
+  let html = "";
+
+  // Featured group at the top
+  if (filteredFeatured.length) {
+    html += `<div class="section-label">Featured Servers</div>`;
+    html += filteredFeatured.map(cardHTML).join("");
+    // One-server-sized gap, only if there are normal servers below
+    if (filteredNormal.length) {
+      html += `<div class="list-gap">Server List</div>`;
+    }
+  }
+
+  // Normal servers
+  html += filteredNormal.map(cardHTML).join("");
+
+  list.innerHTML = html;
+
+  // Wire up copy buttons
+  list.querySelectorAll(".copy-btn").forEach(btn => {
+    btn.onclick = () => copyIP(btn);
+  });
+}
+
+// ---- Copy to clipboard ----
+function copyIP(btn) {
+  const ip = btn.dataset.ip;
+  navigator.clipboard.writeText(ip).then(() => showCopied(btn)).catch(() => {
+    const ta = document.createElement("textarea");
+    ta.value = ip;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    showCopied(btn);
+  });
+}
+function showCopied(btn) {
+  const original = btn.textContent;
+  btn.textContent = "Copied!";
+  btn.classList.add("copied");
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.classList.remove("copied");
+  }, 1500);
+}
+
+// ---- Search + clear ----
+document.getElementById("searchInput").addEventListener("input", e => {
+  searchText = e.target.value.trim().toLowerCase();
+  render();
+});
+document.getElementById("clearFilters").addEventListener("click", () => {
+  activeVersion = null;
+  activeStatus = null;
+  searchText = "";
+  document.getElementById("searchInput").value = "";
+  refreshTagStates();
+  render();
+});
+
+// ---- Init ----
+buildTags();
+render();
