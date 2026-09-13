@@ -4,16 +4,17 @@ const serverNames = [
   "Ironhold", "Frostvale", "Emberfall", "Stormwatch"
 ];
 
-// The 3 paid / featured servers (now shown in the left column)
+// The 3 paid / featured servers (shown in the left column)
 const featuredNames = ["Aurora Prime", "Celestial Core", "Obsidian Elite"];
 
-const versions = ["1.21.1", "1.20.4", "1.19.4"];
+// Small pool used only to give each placeholder server a version
+const sampleVersions = ["1.21.1", "1.20.4", "1.19.4", "26.2", "26.1"];
 
 function makeServer(name, i, featured) {
   const online = Math.random() > 0.2; // ~80% online
   return {
     name,
-    version: versions[i % versions.length],
+    version: sampleVersions[i % sampleVersions.length],
     ip: "mc.ExampleIp.net",
     players: online ? Math.floor(Math.random() * 900) + 20 : 0,
     status: online ? "Online" : "Offline",
@@ -22,14 +23,12 @@ function makeServer(name, i, featured) {
   };
 }
 
-// Featured servers are paid -> always online
 const featuredServers = featuredNames.map((n, i) => {
   const s = makeServer(n, i, true);
   s.status = "Online";
   s.players = Math.floor(Math.random() * 900) + 100;
   return s;
 });
-
 const normalServers = serverNames.map((n, i) => makeServer(n, i, false));
 
 // ---- State ----
@@ -37,11 +36,60 @@ let activeVersion = null;
 let activeStatus = null;
 let searchText = "";
 
-// ---- Filter data ----
-const allVersions = [...new Set(
-  [...featuredServers, ...normalServers].map(s => s.version)
-)].sort().reverse();
-const allStatuses = ["Online", "Offline"];
+/* =========================================================
+   Minecraft version list (from Modrinth, with fallback)
+   ========================================================= */
+// Fallback release list 1.0 -> 26.2 (newest first) if the API can't be reached.
+let allVersions = [
+  "26.2", "26.1",
+  "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
+  "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21",
+  "1.20.6", "1.20.5", "1.20.4", "1.20.3", "1.20.2", "1.20.1", "1.20",
+  "1.19.4", "1.19.3", "1.19.2", "1.19.1", "1.19",
+  "1.18.2", "1.18.1", "1.18",
+  "1.17.1", "1.17",
+  "1.16.5", "1.16.4", "1.16.3", "1.16.2", "1.16.1", "1.16",
+  "1.15.2", "1.15.1", "1.15",
+  "1.14.4", "1.14.3", "1.14.2", "1.14.1", "1.14",
+  "1.13.2", "1.13.1", "1.13",
+  "1.12.2", "1.12.1", "1.12",
+  "1.11.2", "1.11.1", "1.11",
+  "1.10.2", "1.10.1", "1.10",
+  "1.9.4", "1.9.3", "1.9.2", "1.9.1", "1.9",
+  "1.8.9", "1.8.8", "1.8.7", "1.8.6", "1.8.5", "1.8.4", "1.8.3", "1.8.2", "1.8.1", "1.8",
+  "1.7.10", "1.7.9", "1.7.8", "1.7.7", "1.7.6", "1.7.5", "1.7.4", "1.7.2",
+  "1.6.4", "1.6.2", "1.6.1",
+  "1.5.2", "1.5.1", "1.5",
+  "1.4.7", "1.4.6", "1.4.5", "1.4.4", "1.4.2",
+  "1.3.2", "1.3.1",
+  "1.2.5", "1.2.4", "1.2.3", "1.2.2", "1.2.1",
+  "1.1", "1.0"
+];
+
+// Set to true to also include snapshots / pre-releases / release candidates
+const INCLUDE_SNAPSHOTS = false;
+
+async function loadVersionsFromModrinth() {
+  try {
+    const res = await fetch("https://api.modrinth.com/v2/tag/game_version");
+    if (!res.ok) throw new Error("Bad response");
+    const data = await res.json();
+
+    // data is oldest -> newest; each item: { version, version_type, date, major }
+    const filtered = INCLUDE_SNAPSHOTS
+      ? data
+      : data.filter(v => v.version_type === "release");
+
+    // Newest first
+    allVersions = filtered.map(v => v.version).reverse();
+
+    // Refresh the dropdown if it's currently open / populated
+    renderVersionOptions(versionInput.value);
+  } catch (e) {
+    // Silently keep the fallback list (e.g. opened offline / from file://)
+    console.warn("Using fallback version list:", e.message);
+  }
+}
 
 /* =========================================================
    Typeable version combobox
@@ -76,9 +124,7 @@ function openCombo() {
   combo.classList.add("open");
   renderVersionOptions(versionInput.value);
 }
-function closeCombo() {
-  combo.classList.remove("open");
-}
+function closeCombo() { combo.classList.remove("open"); }
 function selectVersion(v) {
   activeVersion = v;
   versionInput.value = v;
@@ -90,7 +136,6 @@ versionInput.addEventListener("focus", openCombo);
 versionInput.addEventListener("input", () => {
   openCombo();
   renderVersionOptions(versionInput.value);
-  // If the box is cleared, treat as "any version"
   if (versionInput.value.trim() === "") {
     activeVersion = null;
     render();
@@ -127,7 +172,6 @@ function updateHighlight(opts) {
   if (opts[highlightIndex]) opts[highlightIndex].scrollIntoView({ block: "nearest" });
 }
 
-// Close combo when clicking outside
 document.addEventListener("click", (e) => {
   if (!combo.contains(e.target)) closeCombo();
 });
@@ -137,7 +181,7 @@ document.addEventListener("click", (e) => {
    ========================================================= */
 function buildStatusTags() {
   const sBox = document.getElementById("statusTags");
-  allStatuses.forEach(st => {
+  ["Online", "Offline"].forEach(st => {
     const el = document.createElement("span");
     el.className = "tag";
     el.textContent = st;
@@ -233,10 +277,9 @@ function renderFeatured() {
 
 function render() {
   const list = document.getElementById("serverList");
-
   const filtered = normalServers
     .filter(matches)
-    .sort((a, b) => b.players - a.players); // most players first
+    .sort((a, b) => b.players - a.players);
 
   document.getElementById("resultCount").textContent =
     `${filtered.length} server${filtered.length !== 1 ? "s" : ""}`;
@@ -287,7 +330,7 @@ const joinModal = document.getElementById("joinModal");
 document.getElementById("joinBtn").onclick = () => { joinModal.hidden = false; };
 document.getElementById("modalClose").onclick = () => { joinModal.hidden = true; };
 joinModal.addEventListener("click", (e) => {
-  if (e.target === joinModal) joinModal.hidden = true; // click backdrop to close
+  if (e.target === joinModal) joinModal.hidden = true;
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") joinModal.hidden = true;
@@ -314,6 +357,7 @@ document.getElementById("clearFilters").addEventListener("click", () => {
    Init
    ========================================================= */
 buildStatusTags();
-renderVersionOptions();
+renderVersionOptions();   // show fallback list immediately
+loadVersionsFromModrinth(); // then replace with live Modrinth data
 renderFeatured();
 render();
