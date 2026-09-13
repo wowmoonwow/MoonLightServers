@@ -26,13 +26,12 @@
   <!-- Main 3-column layout -->
   <main class="layout">
 
-    <!-- LEFT: Ad space -->
-    <aside class="ad-col">
-      <div class="ad-box glass">
-        <span class="ad-label">Advertisement</span>
-        <div class="ad-inner">
-          <p>Your Ad Here</p>
-          <small>300 × 600</small>
+    <!-- LEFT: Featured servers -->
+    <aside class="featured-col">
+      <div class="featured-box glass">
+        <h3 class="featured-heading">★ Featured</h3>
+        <div id="featuredList" class="featured-list">
+          <!-- Featured mini-cards injected by JS -->
         </div>
       </div>
     </aside>
@@ -48,14 +47,19 @@
       </div>
     </section>
 
-    <!-- RIGHT: Tags / filters -->
+    <!-- RIGHT: Filters -->
     <aside class="tags-col">
       <div class="tags-box glass">
         <h3>Filters</h3>
 
         <div class="filter-group">
           <label>Version</label>
-          <div id="versionTags" class="tag-list"></div>
+          <!-- Typeable combobox -->
+          <div class="combo" id="versionCombo">
+            <input id="versionInput" type="text" placeholder="Any version" autocomplete="off" />
+            <button class="combo-arrow" id="versionArrow" aria-label="Toggle list">▾</button>
+            <div class="combo-list" id="versionList"></div>
+          </div>
         </div>
 
         <div class="filter-group">
@@ -68,6 +72,23 @@
     </aside>
 
   </main>
+
+  <!-- Floating Join button (bottom right) -->
+  <button id="joinBtn" class="join-btn">Join</button>
+
+  <!-- Join modal -->
+  <div id="joinModal" class="modal-overlay" hidden>
+    <div class="modal glass">
+      <button id="modalClose" class="modal-close" aria-label="Close">✕</button>
+      <h2 class="modal-title">Add Your Server</h2>
+      <p class="modal-text">
+        Join the Discord to add your server to the server list for <strong>free</strong>!
+        <br /><br />
+        Or pay to get added as a <strong>Featured</strong> server!
+      </p>
+      <div class="discord-embed">Link Not Added</div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>
