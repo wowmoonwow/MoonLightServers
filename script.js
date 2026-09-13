@@ -1,16 +1,10 @@
 // ---- Placeholder server data ----
 const serverNames = [
-  "Crimson Peak",
-  "Azure Haven",
-  "Nova Realms",
-  "Shadowmere",
-  "Ironhold",
-  "Frostvale",
-  "Emberfall",
-  "Stormwatch"
+  "Crimson Peak", "Azure Haven", "Nova Realms", "Shadowmere",
+  "Ironhold", "Frostvale", "Emberfall", "Stormwatch"
 ];
 
-// The 3 paid / featured servers
+// The 3 paid / featured servers (now shown in the left column)
 const featuredNames = ["Aurora Prime", "Celestial Core", "Obsidian Elite"];
 
 const versions = ["1.21.1", "1.20.4", "1.19.4"];
@@ -28,7 +22,7 @@ function makeServer(name, i, featured) {
   };
 }
 
-// Featured servers are paid -> always online, healthy player counts
+// Featured servers are paid -> always online
 const featuredServers = featuredNames.map((n, i) => {
   const s = makeServer(n, i, true);
   s.status = "Online";
@@ -43,29 +37,106 @@ let activeVersion = null;
 let activeStatus = null;
 let searchText = "";
 
-// ---- Build filter tags ----
+// ---- Filter data ----
 const allVersions = [...new Set(
   [...featuredServers, ...normalServers].map(s => s.version)
 )].sort().reverse();
 const allStatuses = ["Online", "Offline"];
 
-function buildTags() {
-  const vBox = document.getElementById("versionTags");
-  const sBox = document.getElementById("statusTags");
+/* =========================================================
+   Typeable version combobox
+   ========================================================= */
+const combo = document.getElementById("versionCombo");
+const versionInput = document.getElementById("versionInput");
+const versionArrow = document.getElementById("versionArrow");
+const versionList = document.getElementById("versionList");
+let highlightIndex = -1;
 
-  allVersions.forEach(v => {
-    const el = document.createElement("span");
-    el.className = "tag";
-    el.textContent = v;
-    el.dataset.version = v;
-    el.onclick = () => {
-      activeVersion = activeVersion === v ? null : v;
-      refreshTagStates();
-      render();
-    };
-    vBox.appendChild(el);
+function renderVersionOptions(filter = "") {
+  const f = filter.trim().toLowerCase();
+  const matched = allVersions.filter(v => v.toLowerCase().includes(f));
+  versionList.innerHTML = "";
+  highlightIndex = -1;
+
+  if (matched.length === 0) {
+    versionList.innerHTML = `<div class="combo-empty">No versions found</div>`;
+    return;
+  }
+
+  matched.forEach(v => {
+    const opt = document.createElement("div");
+    opt.className = "combo-option" + (v === activeVersion ? " selected" : "");
+    opt.textContent = v;
+    opt.onclick = () => selectVersion(v);
+    versionList.appendChild(opt);
   });
+}
 
+function openCombo() {
+  combo.classList.add("open");
+  renderVersionOptions(versionInput.value);
+}
+function closeCombo() {
+  combo.classList.remove("open");
+}
+function selectVersion(v) {
+  activeVersion = v;
+  versionInput.value = v;
+  closeCombo();
+  render();
+}
+
+versionInput.addEventListener("focus", openCombo);
+versionInput.addEventListener("input", () => {
+  openCombo();
+  renderVersionOptions(versionInput.value);
+  // If the box is cleared, treat as "any version"
+  if (versionInput.value.trim() === "") {
+    activeVersion = null;
+    render();
+  }
+});
+versionArrow.addEventListener("click", (e) => {
+  e.stopPropagation();
+  combo.classList.contains("open") ? closeCombo() : (versionInput.focus(), openCombo());
+});
+
+// Keyboard navigation
+versionInput.addEventListener("keydown", (e) => {
+  const opts = [...versionList.querySelectorAll(".combo-option")];
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (!combo.classList.contains("open")) openCombo();
+    highlightIndex = Math.min(highlightIndex + 1, opts.length - 1);
+    updateHighlight(opts);
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    highlightIndex = Math.max(highlightIndex - 1, 0);
+    updateHighlight(opts);
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (highlightIndex >= 0 && opts[highlightIndex]) {
+      selectVersion(opts[highlightIndex].textContent);
+    }
+  } else if (e.key === "Escape") {
+    closeCombo();
+  }
+});
+function updateHighlight(opts) {
+  opts.forEach((o, i) => o.classList.toggle("highlight", i === highlightIndex));
+  if (opts[highlightIndex]) opts[highlightIndex].scrollIntoView({ block: "nearest" });
+}
+
+// Close combo when clicking outside
+document.addEventListener("click", (e) => {
+  if (!combo.contains(e.target)) closeCombo();
+});
+
+/* =========================================================
+   Status tags
+   ========================================================= */
+function buildStatusTags() {
+  const sBox = document.getElementById("statusTags");
   allStatuses.forEach(st => {
     const el = document.createElement("span");
     el.className = "tag";
@@ -73,21 +144,20 @@ function buildTags() {
     el.dataset.status = st;
     el.onclick = () => {
       activeStatus = activeStatus === st ? null : st;
-      refreshTagStates();
+      refreshStatusStates();
       render();
     };
     sBox.appendChild(el);
   });
 }
-
-function refreshTagStates() {
-  document.querySelectorAll("[data-version]").forEach(el =>
-    el.classList.toggle("active", el.dataset.version === activeVersion));
+function refreshStatusStates() {
   document.querySelectorAll("[data-status]").forEach(el =>
     el.classList.toggle("active", el.dataset.status === activeStatus));
 }
 
-// ---- Filtering ----
+/* =========================================================
+   Filtering
+   ========================================================= */
 function matches(s) {
   const okVersion = !activeVersion || s.version === activeVersion;
   const okStatus = !activeStatus || s.status === activeStatus;
@@ -97,7 +167,9 @@ function matches(s) {
   return okVersion && okStatus && okSearch;
 }
 
-// ---- Card HTML ----
+/* =========================================================
+   Rendering
+   ========================================================= */
 function cardHTML(s) {
   const statusClass = s.status === "Online" ? "online" : "offline";
   const playersLine = s.status === "Online"
@@ -105,18 +177,14 @@ function cardHTML(s) {
     : `<span class="players" style="color:#f8a3a3;"><span class="dot" style="background:#f87171;box-shadow:none;"></span>Offline</span>`;
 
   return `
-    <article class="server-card ${s.featured ? "featured" : ""}">
-      <!-- Top half: banner -->
+    <article class="server-card">
       <div class="banner">
         PlaceHolder Banner
-        ${s.featured ? `<span class="featured-badge">★ Featured</span>` : ""}
         <div class="banner-ip">
           <span class="ip-text">${s.ip}</span>
           <button class="copy-btn" data-ip="${s.ip}">Copy</button>
         </div>
       </div>
-
-      <!-- Bottom half -->
       <div class="card-body">
         <div class="pfp">Blank<br>pfp</div>
         <div class="info">
@@ -137,52 +205,59 @@ function cardHTML(s) {
   `;
 }
 
-// ---- Render ----
+function miniCardHTML(s) {
+  return `
+    <div class="mini-card">
+      <div class="mini-banner">PlaceHolder Banner</div>
+      <div class="mini-body">
+        <div class="mini-title">${s.name}</div>
+        <div class="mini-players"><span class="dot"></span>${s.players} Players Online</div>
+        <div class="mini-ip">
+          <span class="ip-text">${s.ip}</span>
+          <button class="copy-btn" data-ip="${s.ip}">Copy</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderFeatured() {
+  const box = document.getElementById("featuredList");
+  box.innerHTML = featuredServers
+    .slice()
+    .sort((a, b) => b.players - a.players)
+    .map(miniCardHTML)
+    .join("");
+  wireCopyButtons(box);
+}
+
 function render() {
   const list = document.getElementById("serverList");
 
-  const filteredFeatured = featuredServers
+  const filtered = normalServers
     .filter(matches)
-    .sort((a, b) => b.players - a.players);
+    .sort((a, b) => b.players - a.players); // most players first
 
-  const filteredNormal = normalServers
-    .filter(matches)
-    // Default sort: most players online first
-    .sort((a, b) => b.players - a.players);
-
-  const total = filteredFeatured.length + filteredNormal.length;
   document.getElementById("resultCount").textContent =
-    `${total} server${total !== 1 ? "s" : ""}`;
+    `${filtered.length} server${filtered.length !== 1 ? "s" : ""}`;
 
-  if (total === 0) {
+  if (filtered.length === 0) {
     list.innerHTML = `<div class="empty">No servers match your filters.</div>`;
     return;
   }
 
-  let html = "";
+  list.innerHTML = filtered.map(cardHTML).join("");
+  wireCopyButtons(list);
+}
 
-  // Featured group at the top
-  if (filteredFeatured.length) {
-    html += `<div class="section-label">Featured Servers</div>`;
-    html += filteredFeatured.map(cardHTML).join("");
-    // One-server-sized gap, only if there are normal servers below
-    if (filteredNormal.length) {
-      html += `<div class="list-gap">Server List</div>`;
-    }
-  }
-
-  // Normal servers
-  html += filteredNormal.map(cardHTML).join("");
-
-  list.innerHTML = html;
-
-  // Wire up copy buttons
-  list.querySelectorAll(".copy-btn").forEach(btn => {
+/* =========================================================
+   Copy to clipboard
+   ========================================================= */
+function wireCopyButtons(scope) {
+  scope.querySelectorAll(".copy-btn").forEach(btn => {
     btn.onclick = () => copyIP(btn);
   });
 }
-
-// ---- Copy to clipboard ----
 function copyIP(btn) {
   const ip = btn.dataset.ip;
   navigator.clipboard.writeText(ip).then(() => showCopied(btn)).catch(() => {
@@ -205,7 +280,22 @@ function showCopied(btn) {
   }, 1500);
 }
 
-// ---- Search + clear ----
+/* =========================================================
+   Join modal
+   ========================================================= */
+const joinModal = document.getElementById("joinModal");
+document.getElementById("joinBtn").onclick = () => { joinModal.hidden = false; };
+document.getElementById("modalClose").onclick = () => { joinModal.hidden = true; };
+joinModal.addEventListener("click", (e) => {
+  if (e.target === joinModal) joinModal.hidden = true; // click backdrop to close
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") joinModal.hidden = true;
+});
+
+/* =========================================================
+   Search + clear
+   ========================================================= */
 document.getElementById("searchInput").addEventListener("input", e => {
   searchText = e.target.value.trim().toLowerCase();
   render();
@@ -214,11 +304,16 @@ document.getElementById("clearFilters").addEventListener("click", () => {
   activeVersion = null;
   activeStatus = null;
   searchText = "";
+  versionInput.value = "";
   document.getElementById("searchInput").value = "";
-  refreshTagStates();
+  refreshStatusStates();
   render();
 });
 
-// ---- Init ----
-buildTags();
+/* =========================================================
+   Init
+   ========================================================= */
+buildStatusTags();
+renderVersionOptions();
+renderFeatured();
 render();
